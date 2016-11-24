@@ -37,13 +37,9 @@ import android.os.AsyncTask;
 import android.os.Parcelable;
 import android.util.Log;
 
-<<<<<<< HEAD
-public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCompleteCallback {
+public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCompleteCallback, ReaderCallback {
     private static final String REGISTER_MIFARE_CLASSIC = "registerMifareClassic";
     private static final String REGISTER_MIFARE_ULTRALIGHT = "registerMifareUltralight";
-=======
-public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCompleteCallback, ReaderCallback {
->>>>>>> ac6e1b72fe9afd8b2e2a8c0e681cdc5661134810
     private static final String REGISTER_MIME_TYPE = "registerMimeType";
     private static final String REMOVE_MIME_TYPE = "removeMimeType";
     private static final String REGISTER_NDEF = "registerNdef";
