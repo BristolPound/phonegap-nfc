@@ -808,7 +808,7 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
 
         String command = MessageFormat.format(javaScriptEventTemplate, MIFARE_ULTRALIGHT, tagJSON);
         Log.v(TAG, command);
-        this.webView.sendJavascript(command);
+        sendJavascript(command);
 
     }
 
@@ -896,7 +896,7 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
             @Override
             protected void onPostExecute(String command)
             {
-                webView.sendJavascript(command);
+                sendJavascript(command);
             }
         }.execute(tag);
     }
@@ -1035,9 +1035,23 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
         }
 
     }
-	
-	//WORKAROUND: CordovaWebView.sendJavascript is deprecated and no longer works in Cordova 5 with pre KitKat devices.
+    
+    //WORKAROUND: CordovaWebView.sendJavascript is deprecated and no longer works in Cordova 5 with pre KitKat devices.
     private void sendJavascript(final String js) {
-		webView.loadUrl("javascript:" + js);
-	}
+        Log.v(js);
+        try {
+            webView.loadUrl("javascript:" + js);
+            return;
+        } catch (Exception e) {
+            Log.v(e.getMessage());
+        }
+        
+        try {
+            // try depricated API
+            webView.sendJavascript(js);
+            return;
+        } catch (Exception e) {
+            Log.v(e.getMessage());
+        }
+    }
 }
