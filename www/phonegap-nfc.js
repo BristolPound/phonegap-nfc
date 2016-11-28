@@ -2,32 +2,37 @@
 /*global cordova, console */
 "use strict";
 
-function handleNfcFromIntentFilter() {
-
-    // This was historically done in cordova.addConstructor but broke with PhoneGap-2.2.0.
-    // We need to handle NFC from an Intent that launched the application, but *after*
-    // the code in the application's deviceready has run.  After upgrading to 2.2.0,
-    // addConstructor was finishing *before* deviceReady was complete and the
-    // ndef listeners had not been registered.
-    // It seems like there should be a better solution.
     if (cordova.platformId === "android" || cordova.platformId === "windows") {
-        setTimeout(
-            function () {
+        cordova.channel.onCordovaReady.subscribe(function() {
                 cordova.exec(
-                    function () {
-                        console.log("Initialized the NfcPlugin");
+                    function (messageAsJson) {
+                        console.log("Incoming data ...");
+                        console.log(messageAsJson);
+                        if (messageAsJson)
+                        {
+                            var m = JSON.parse(messageAsJson);
+                            
+                            if (m.class)
+                            {
+                                switch (m.class) {
+                                case "log":
+                                    console.log(m.message);
+                                    break;
+                                case "event":
+                                    fireNfcTagObjectEvent(m.type, m.data);
+                                    break;
+                                };
+                            };
+                        };
                     },
                     function (reason) {
                         console.log("Failed to initialize the NfcPlugin " + reason);
                     },
                     "NfcPlugin", "init", []
                 );
-            }, 10
-        );
-    }
+        });
 }
 
-document.addEventListener('deviceready', handleNfcFromIntentFilter, false);
 
 var ndef = {
 
@@ -735,10 +740,14 @@ var uriHelper = {
 // added since WP8 must call a named function
 // TODO consider switching NFC events from JS events to using the PG callbacks
 function fireNfcTagEvent(eventType, tagAsJson) {
+    fireNfcTagObjectEvent(eventType, JSON.parse(tagAsJson));
+}
+
+function fireNfcTagObjectEvent(eventType, tagAsObject) {
     setTimeout(function () {
         var e = document.createEvent('Events');
         e.initEvent(eventType, true, false);
-        e.tag = JSON.parse(tagAsJson);
+        e.tag = tagAsObject;
         console.log(e.tag);
         document.dispatchEvent(e);
     }, 10);

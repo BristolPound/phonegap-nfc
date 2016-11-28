@@ -87,6 +87,7 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
 
     private CallbackContext shareTagCallback;
     private CallbackContext handoverCallback;
+    private CallbackContext handleEventCallback;
 
     @Override
     public boolean execute(String action, JSONArray data, CallbackContext callbackContext) throws JSONException {
@@ -236,6 +237,8 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
     private void init(CallbackContext callbackContext) {
         Log.d(TAG, "Enabling plugin " + getIntent());
 
+        handleEventCallback = callbackContext;
+
         startNfc();
         if (inReaderMode) {
             if (savedTag != null) {
@@ -244,7 +247,13 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
         } else if (!recycledIntent()) {
             parseMessage();
         }
-        callbackContext.success();
+
+        JSONObject jsonMessage = new JSONObject();
+
+        jsonMessage.put("class","log");
+        jsonMessage.put("message","Initialized the NfcPlugin");
+
+        sendData(jsonMessage);
     }
 
     private void removeMimeType(JSONArray data, CallbackContext callbackContext) throws JSONException {
@@ -745,14 +754,7 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
     }
 
     private void fireNdefEvent(String type, Ndef ndef, Parcelable[] messages) {
-
-        JSONObject jsonObject = buildNdefJSON(ndef, messages);
-        String tag = jsonObject.toString();
-
-        String command = MessageFormat.format(javaScriptEventTemplate, type, tag);
-        Log.v(TAG, command);
-        sendJavascript(command);
-
+        sendEventData(type, buildNdefJSON(ndef, messages));
     }
 
     private void fireMifareUltralightEvent(Tag tag)
@@ -806,10 +808,7 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
             e.printStackTrace();
         }
 
-        String command = MessageFormat.format(javaScriptEventTemplate, MIFARE_ULTRALIGHT, tagJSON);
-        Log.v(TAG, command);
-        sendJavascript(command);
-
+        sendEventData(MIFARE_ULTRALIGHT, tagJSON);
     }
 
     private void fireMifareClassicEvent(Tag tag)
@@ -888,45 +887,24 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
                     e.printStackTrace();
                 }
 
-                String command = MessageFormat.format(javaScriptEventTemplate, MIFARE_CLASSIC, tagJSON);
-                Log.v(TAG, command);
-                return command;
+                Log.v(TAG, tagJSON);
+                return tagJSON;
             }
 
             @Override
-            protected void onPostExecute(String command)
+            protected void onPostExecute(JSONObject tagJSON)
             {
-                sendJavascript(command);
+                sendEventData(MIFARE_CLASSIC, tagJSON);
             }
         }.execute(tag);
     }
 
     private void fireNdefFormatableEvent (Tag tag) {
-        JSONObject tagJSON = Util.tagToJSON(tag);
-        /*
-        NfcA nfca = NfcA.get(tag);
-        byte[] atqa = nfca.getAtqa();
-        short sak = nfca.getSak();
-
-        JSONObject nfcaj = new JSONObject();
-        try
-        {
-            nfcaj.put("sak", sak);
-            nfcaj.put("atqa", Util.byteArrayToJSON(atqa));
-            tagJSON.put("NfcA", nfcaj);
-        }
-        catch (JSONException ex){}
-        */
-        String command = MessageFormat.format(javaScriptEventTemplate, NDEF_FORMATABLE, tagJSON);
-        Log.v(TAG, command);
-        sendJavascript(command);
+        sendEventData(NDEF_FORMATABLE, tag);
     }
 
     private void fireTagEvent (Tag tag) {
-
-        String command = MessageFormat.format(javaScriptEventTemplate, TAG_DEFAULT, Util.tagToJSON(tag));
-        Log.v(TAG, command);
-        sendJavascript(command);
+        sendEventData(TAG_DEFAULT, tag);
     }
 
     JSONObject buildNdefJSON(Ndef ndef, Parcelable[] messages) {
@@ -1014,12 +992,6 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
         getActivity().setIntent(intent);
     }
 
-    String javaScriptEventTemplate =
-        "var e = document.createEvent(''Events'');\n" +
-        "e.initEvent(''{0}'');\n" +
-        "e.tag = {1};\n" +
-        "document.dispatchEvent(e);";
-
     @Override
     public void onNdefPushComplete(NfcEvent event) {
 
@@ -1035,23 +1007,33 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
         }
 
     }
-    
+
     //WORKAROUND: CordovaWebView.sendJavascript is deprecated and no longer works in Cordova 5 with pre KitKat devices.
-    private void sendJavascript(final String js) {
-        Log.v(TAG, js);
-        try {
-            webView.loadUrl("javascript:" + js);
-            return;
-        } catch (Exception e) {
-            Log.v(TAG, e.getMessage());
-        }
-        
-        try {
-            // try depricated API
-            webView.sendJavascript(js);
-            return;
-        } catch (Exception e) {
-            Log.v(TAG, e.getMessage());
-        }
+    private void sendEventData(final String type, Tag tag) {
+
+        sendEventData(type, Util.tagToJSON(tag));
+
+    }
+
+    private void sendEventData(final String type, JSONObject data) {
+
+        JSONObject jsonMessage = new JSONObject();
+
+        jsonMessage.put("class","event");
+        jsonMessage.put("type",type);
+        jsonMessage.put("data", data);
+
+        sendData(jsonMessage);
+    }
+
+    private void sendData(JSONObject data) {
+
+        String message = data.toString();
+
+        Log.v(TAG, message);
+
+        PluginResult dataResult = new PluginResult(PluginResult.Status.OK, message);
+        dataResult.setKeepCallback(true);
+        handleEventCallback.sendPluginResult(dataResult);
     }
 }
