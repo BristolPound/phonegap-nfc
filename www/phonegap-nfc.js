@@ -3,8 +3,8 @@
 "use strict";
 
     if (cordova.platformId === "android" || cordova.platformId === "windows") {
-        cordova.channel.onCordovaReady.subscribe(function() {
-                cordova.exec(
+        require('cordova/channel').onCordovaReady.subscribe(function() {
+            require('cordova/exec')(
                     function (messageAsJson) {
                         console.log("Incoming data ...");
                         console.log(messageAsJson);
