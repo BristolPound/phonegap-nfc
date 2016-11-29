@@ -250,8 +250,15 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
 
         JSONObject jsonMessage = new JSONObject();
 
-        jsonMessage.put("class","log");
-        jsonMessage.put("message","Initialized the NfcPlugin");
+        try
+        {
+	        jsonMessage.put("class","log");
+	        jsonMessage.put("message","Initialized the NfcPlugin");
+        }
+        catch (JSONException e)
+        {
+            e.printStackTrace();
+        }
 
         sendData(jsonMessage);
     }
@@ -895,7 +902,14 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
             @Override
             protected void onPostExecute(String command)
             {
-                sendEventData(MIFARE_CLASSIC, new JSONObject(command));
+                try
+                {
+	                sendEventData(MIFARE_CLASSIC, new JSONObject(command));
+                }
+                catch (JSONException e)
+                {
+                    e.printStackTrace();
+                }
             }
         }.execute(tag);
     }
@@ -1020,9 +1034,16 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
 
         JSONObject jsonMessage = new JSONObject();
 
-        jsonMessage.put("class","event");
-        jsonMessage.put("type",type);
-        jsonMessage.put("data", data);
+        try
+        {
+	        jsonMessage.put("class","event");
+	        jsonMessage.put("type",type);
+	        jsonMessage.put("data", data);
+        }
+        catch (JSONException e)
+        {
+            e.printStackTrace();
+        }
 
         sendData(jsonMessage);
     }
