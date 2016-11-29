@@ -744,44 +744,26 @@ var uriHelper = {
 
 function cordovaRegisterListener(listernerType, win, fail, data, callbackType, callback)
 {
-    nfcListeners[listernerType].callbacks.push({type: callbackType, callback: callback});
+    var lt = nfcListeners[listernerType];
 
     if (callbackType == 'event')
     {
         document.addEventListener(listernerType, callback, false);
     }
 
-    cordova.exec(win, fail, "NfcPlugin", nfcListeners[listernerType].register, data);
+    cordova.exec(win, fail, "NfcPlugin", lt.register, data);
 }
 
 function cordovaRemoveListener(listernerType, callback, win, fail, data)
 {
     var lt = nfcListeners[listernerType];
-    var cb = lt.callbacks;
-    var i  = cb.length;
-    var found = 0;
 
-    while (i--)
-    {
-        if (cb[i].callback === callback)
-        {
-            var c = Auction.auctions.splice(i, 1)[0];
+    document.removeEventListener(lt.eventType, callback, false);
 
-            if (c.type == 'event')
-            {
-                document.removeEventListener(lt.eventType, callback, false);
-            }
-
-            found++;
-        }
-    }
-
-    if (found && cb.length == 0 && lt.unregister)
+    if (lt.unregister)
     {
         cordova.exec(win, fail, "NfcPlugin", lt.unregister, data);
     }
-
-    return found;
 }
 
 function cordovaIncomingEvent(type, data)
@@ -801,6 +783,22 @@ function cordovaIncomingEvent(type, data)
     }
 }
 
+function setTimeoutDispatcher(callback, ...args)
+{
+    this.context = this;
+    this.context.callback = callback;
+    this.context.args = args;
+}
+
+setTimeoutDispatcher.prototype.dispatch = function()
+{
+    setTimeout(function () {
+        // run detattched
+        console.log("calling callback with arguments "+JSON.stringify(...this.args));
+        this.callback(...this.args);
+    }.bind(this.context), 10);
+}
+
 // added since WP8 must call a named function
 // TODO consider switching NFC events from JS events to using the PG callbacks
 function fireNfcTagEvent(eventType, tagAsJson) {
@@ -808,13 +806,14 @@ function fireNfcTagEvent(eventType, tagAsJson) {
 }
 
 function fireNfcTagObjectEvent(eventType, tagAsObject) {
-    setTimeout(function () {
+    var x = new setTimeoutDispatcher(function (eventType, tagAsObject) {
         var e = document.createEvent('Events');
         e.initEvent(eventType, true, false);
         e.tag = tagAsObject;
         console.log(e.tag);
         document.dispatchEvent(e);
-    }, 10);
+    }, eventType, tagAsObject);
+    x.dispatch();
 }
 
 // textHelper and uriHelper aren't exported, add a property
