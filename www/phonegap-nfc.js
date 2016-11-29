@@ -825,7 +825,7 @@ var uriHelper = {
 function logDeprication(type)
 {
     var t = nfcListeners[type].listener;
-    console.Log("Method nfc.add"+t+"Listener is depricated. Please use nfc.add"+t+"Listener2 instead and adjust your callback function accordingly.");
+    console.log("Method nfc.add"+t+"Listener is depricated. Please use nfc.add"+t+"Listener2 instead and adjust your callback function accordingly.");
 }
 
 function cordovaRegisterListener(listernerType, win, fail, data, callbackType, callback)
