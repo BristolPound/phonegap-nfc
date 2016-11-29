@@ -870,7 +870,7 @@ function cordovaRemoveListener(listernerType, callback, win, fail, data)
     return found;
 }
 
-cordovaIncomingEvent(type, data)
+function cordovaIncomingEvent(type, data)
 {
     var lt = nfcListeners[type];
     var cb = lt.callbacks;
