@@ -6,7 +6,7 @@
         require('cordova/channel').onCordovaReady.subscribe(function() {
             require('cordova/exec')(
                     function (messageAsJson) {
-                        console.log("Incoming data: "+messageAsJson);
+                        console.log("NfcPlugin: incoming data: "+messageAsJson);
                         if (messageAsJson)
                         {
                             var m = JSON.parse(messageAsJson);
@@ -15,7 +15,7 @@
                             {
                                 switch (m.class) {
                                 case "log":
-                                    console.log(m.message);
+                                    console.log("NfcPlugin: "+m.message);
                                     break;
                                 case "event":
                                     cordovaIncomingEvent(m.type, m.data);
@@ -25,7 +25,7 @@
                         };
                     },
                     function (reason) {
-                        console.log("Failed to initialize the NfcPlugin " + reason);
+                        console.log("NfcPlugin: Failed to initialize. " + reason);
                     },
                     "NfcPlugin", "init", []
                 );
@@ -39,30 +39,35 @@ var nfcListeners = {
     //  register: '',               // => method to call in cordova.exec when registering a listener
     //  unregister: '',             // => method to call in cordova.exec when unregistering a listener
     //  eventType: '',              // => again, the event type
+    //  callbacks: []               // => storage for the callback functions as [{type: callbackType, callback: callback}]
     // },
     'tag': {
         listener: 'TagDiscovered',
         register: 'registerTag',
         unregister: 'removeTag',
         eventType: 'tag',
+        callbacks: []
     },
     'ndef-mime': {
         listener: 'MimeType',
         register: 'registerMimeType',
         unregister: 'removeMimeType',
         eventType: 'ndef-mime',
+        callbacks: []
     },
     'ndef': {
         listener: 'Ndef',
         register: 'registerNdef',
         unregister: 'removeNdef',
         eventType: 'ndef',
+        callbacks: []
     },
     'ndef-formatable': {
         listener: 'NdefFormatable',
         register: 'registerNdefFormatable',
         unregister: '',
         eventType: 'ndef-formatable',
+        callbacks: []
     }
 };
 
@@ -213,7 +218,7 @@ var ndef = {
                 payload = ndefRecords;
             }
         } else {
-            console.log("WARNING: Expecting an array of NDEF records");
+            console.log("NfcPlugin: WARNING: Expecting an array of NDEF records");
         }
 
         return ndef.record(ndef.TNF_WELL_KNOWN, ndef.RTD_SMART_POSTER, id, payload);
@@ -448,21 +453,29 @@ var ndef = {
 
 // nfc provides javascript wrappers to the native phonegap implementation
 var nfc = {
-
-    addTagDiscoveredListener: function (callback, win, fail) {
-        cordovaRegisterListener('tag', win, fail, [], 'event', callback);
+    listenerEventHandling: {
+        CALLBACK: 0,
+        EVENT: 3,
+    },
+    listenerResultFormat: {
+        TAG: 0,
+        EVENT: 2,
     },
 
-    addMimeTypeListener: function (mimeType, callback, win, fail) {
-        cordovaRegisterListener('ndef-mime', win, fail, [mimeType], 'event', callback);
+    addTagDiscoveredListener: function (callback, win, fail, options) {
+        cordovaRegisterListener('tag', win, fail, [], callback, options);
     },
 
-    addNdefListener: function (callback, win, fail) {
-        cordovaRegisterListener('ndef', win, fail, [], 'event', callback);
+    addMimeTypeListener: function (mimeType, callback, win, fail, options) {
+        cordovaRegisterListener('ndef-mime', win, fail, [mimeType], callback, options);
     },
 
-    addNdefFormatableListener: function (callback, win, fail) {
-        cordovaRegisterListener('ndef-formatable', win, fail, [], 'event', callback);
+    addNdefListener: function (callback, win, fail, options) {
+        cordovaRegisterListener('ndef', win, fail, [], callback, options);
+    },
+
+    addNdefFormatableListener: function (callback, win, fail, options) {
+        cordovaRegisterListener('ndef-formatable', win, fail, [], callback, options);
     },
 
     write: function (ndefMessage, win, fail) {
@@ -742,11 +755,35 @@ var uriHelper = {
     }
 };
 
-function cordovaRegisterListener(listernerType, win, fail, data, callbackType, callback)
+function logDeprication(type)
+{
+    var t = nfcListeners[type].listener;
+    console.log("NfcPlugin: Method nfc.add"+t+"Listener using event bubbling is depricated. Please add the options arguement: "
+	+"Use "+nfc.listenerEventHandling.EVENT+" to keep event bubbling but prevent this message, "
+	+nfc.listenerResultFormat.EVENT+" for a compatible direct callback call and "
+	+nfc.listenerEventHandling.CALLBACK+" when you adjust your callback function accordingly (returning data only includes the event.tag).");
+}
+
+function cordovaRegisterListener(listernerType, win, fail, data, callback, options)
 {
     var lt = nfcListeners[listernerType];
+    var cb = lt.callbacks;
 
-    if (callbackType == 'event')
+    if (options === undefined)
+    {
+        logDeprication(listernerType);
+        options = nfc.listenerEventHandling.EVENT;
+    }
+
+    var e = {
+        type: (options & (nfc.listenerEventHandling.CALLBACK | nfc.listenerEventHandling.EVENT)),
+        format: (options & (nfc.listenerResultFormat.TAG | nfc.listenerResultFormat.EVENT)),
+        callback: callback
+    };
+
+    cb.push(e);
+
+    if (e.type == nfc.listenerEventHandling.EVENT)
     {
         document.addEventListener(listernerType, callback, false);
     }
@@ -757,13 +794,31 @@ function cordovaRegisterListener(listernerType, win, fail, data, callbackType, c
 function cordovaRemoveListener(listernerType, callback, win, fail, data)
 {
     var lt = nfcListeners[listernerType];
+    var cb = lt.callbacks;
+    var i  = cb.length;
+    var found = 0;
 
-    document.removeEventListener(lt.eventType, callback, false);
+    while (i--)
+    {
+        if (cb[i].callback === callback)
+        {
+            var c = cb.splice(i, 1)[0];
 
-    if (lt.unregister)
+            if (c.type == nfc.listenerEventHandling.EVENT)
+            {
+                document.removeEventListener(lt.eventType, callback, false);
+            }
+
+            found++;
+        }
+    }
+
+    if (found && cb.length == 0 && lt.unregister)
     {
         cordova.exec(win, fail, "NfcPlugin", lt.unregister, data);
     }
+
+    return found;
 }
 
 function cordovaIncomingEvent(type, data)
@@ -776,7 +831,26 @@ function cordovaIncomingEvent(type, data)
     {
         var c = cb[i];
 
-        if (c.type == 'event')
+        if (c.type == nfc.listenerEventHandling.CALLBACK)
+        {
+            if (c.format == nfc.listenerResultFormat.EVENT)
+            {
+                data = {
+                    type: type,
+                    timeStamp: Date.now(),
+                    bubbles: false,
+                    cancelable: false,
+                    tag: data,
+                    target: "",
+                }
+            }
+
+            console.log("NfcPlugin: dispatching callback["+i+"] of type "+type+": "+JSON.stringify(data))
+            var x = new setTimeoutDispatcher(c.callback, data, type);
+            x.dispatch();
+        }
+        else
+        if (c.type == nfc.listenerEventHandling.EVENT)
         {
             fireNfcTagObjectEvent(type, data);
         }
@@ -794,7 +868,7 @@ setTimeoutDispatcher.prototype.dispatch = function()
 {
     setTimeout(function () {
         // run detattched
-        console.log("calling callback with arguments "+JSON.stringify(...this.args));
+        console.log("NfcPlugin: calling callback with arguments "+JSON.stringify(...this.args));
         this.callback(...this.args);
     }.bind(this.context), 10);
 }
@@ -810,7 +884,7 @@ function fireNfcTagObjectEvent(eventType, tagAsObject) {
         var e = document.createEvent('Events');
         e.initEvent(eventType, true, false);
         e.tag = tagAsObject;
-        console.log(e.tag);
+        console.log("NfcPlugin: "+e.tag);
         document.dispatchEvent(e);
     }, eventType, tagAsObject);
     x.dispatch();
