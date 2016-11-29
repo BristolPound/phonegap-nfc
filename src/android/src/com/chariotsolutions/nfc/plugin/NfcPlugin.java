@@ -886,15 +886,16 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
                 {
                     e.printStackTrace();
                 }
-
-                Log.v(TAG, tagJSON);
-                return tagJSON;
+                
+                String command = tagJSON.toString();
+                Log.v(TAG, command);
+                return command;
             }
 
             @Override
-            protected void onPostExecute(JSONObject tagJSON)
+            protected void onPostExecute(String command)
             {
-                sendEventData(MIFARE_CLASSIC, tagJSON);
+                sendEventData(MIFARE_CLASSIC, new JSONObject(command));
             }
         }.execute(tag);
     }
